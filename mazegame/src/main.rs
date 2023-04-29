@@ -1,12 +1,15 @@
 use ggez::{Context, ContextBuilder, GameError, GameResult, input::keyboard::KeyCode};
 use ggez::graphics::{self, Color, Rect};
 use ggez::event::{self, EventHandler};
+use ggez::input::keyboard::KeyInput;
+
 use oorandom::Rand32;
+
 use rand::{Rng, thread_rng};
 use rand::prelude::ThreadRng;
 use rand::seq::SliceRandom;
+
 use std::collections::VecDeque;
-use ggez::input::keyboard::KeyInput;
 use std::net::{TcpListener, TcpStream}; // line 10..12 socket, thread 관련 lib 추가
 use std::io::{BufRead, BufReader, Write};
 use std::thread;
@@ -108,7 +111,12 @@ struct MyGame {
 }
 
 impl MyGame {
-    pub unsafe fn new(x: &mut Context) -> Self {
+    pub unsafe fn new(
+        x: &mut Context,
+        stream: TcpStream,
+        server_flag: bool
+
+    ) -> Self {
         let wall_pos = GridPosition { x: 0, y: 0 };
         MyGame {
             wall: Wall::new(wall_pos),
@@ -363,8 +371,29 @@ fn main() {
     // Create an instance of your event handler.
     // Usually, you should provide it with the Context object to
     // use when setting your game up.
-    let my_game = unsafe { MyGame::new(&mut ctx) };
+    let mut server_flag = false;
+    let tcp_stream = match TcpListener::bind("127.0.0.1:8081") {
+      Ok(res) => {
+          println!("Server: 127.0.0.1:8081");
+          let mut incoming_streams = res.incoming();
+          let stream = incoming_streams.next().unwrap().unwrap();
+          let peer_ip_address = stream.peer_addr().unwrap();
+          println!("connected {}", peer_ip_address);
+          stream.set_nonblocking(true).unwrap();
+          server_flag = true;
+          stream
+      }
+        Err(err) => {
+            println!("Client: 127.0.0.1:8082");
+            let stream = TcpStream::connect("127.0.0.1:8081").unwrap();
+            let peer_ip_address = stream.peer_addr().unwrap();
+            println!("connected {}", peer_ip_address);
+            stream.set_nonblocking(true).unwrap();
+            stream
+        }
+    };
 
+    let my_game = unsafe { MyGame::new(&mut ctx, tcp_stream, server_flag) };
     // Run!
     event::run(ctx, event_loop, my_game);
 
