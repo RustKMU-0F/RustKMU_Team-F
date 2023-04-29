@@ -314,52 +314,6 @@ impl EventHandler for MyGame {
         Ok(())
     }
 }
-// ----------------  TCP socket  --------------
-struct TcpServer {
-    listener: TcpListener,
-}
-
-impl TcpServer {
-    fn new(addr: &str) -> Result<Self, std::io::Error> {
-        let listener = TcpListener::bind(addr)?;
-        Ok(Self { listener })
-    }
-
-    fn run(&self) -> std::io::Result<()> {
-        for stream in self.listener.incoming() {
-            match stream {
-                Ok(stream) => {
-                    self.handle_client(stream);
-                }
-                Err(e) => {
-                    println!("Error: {}", e);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn handle_client(&self, stream: TcpStream) {
-        let mut reader = BufReader::new(stream.try_clone().unwrap());
-        let mut writer = stream.try_clone().unwrap();
-
-        loop {
-            let mut input = String::new();
-            reader.read_line(&mut input).unwrap();
-
-            let trimmed = input.trim();
-            println!("Received: {}", trimmed);
-
-            if trimmed == "exit" {
-                writer.write_all(b"Goodbye!\n").unwrap();
-                break;
-            }
-
-            writer.write_all(trimmed.as_bytes()).unwrap();
-            writer.write_all(b"\n").unwrap();
-        }
-    }
-}
 
 
 fn main() {
@@ -396,22 +350,5 @@ fn main() {
     let my_game = unsafe { MyGame::new(&mut ctx, tcp_stream, server_flag) };
     // Run!
     event::run(ctx, event_loop, my_game);
-
-    // 로컬호스트 사용해서 테스트
-    let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                let server = TcpServer { listener: listener.try_clone().unwrap() };
-                thread::spawn(move || {
-                    server.handle_client(stream);
-                });
-                println!("Listening OK")
-            }
-            Err(e) => {
-                println!("Error: {}", e);
-            }
-        }
-    }
 
 }
