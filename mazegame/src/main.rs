@@ -388,21 +388,21 @@ impl Player {
         }
 
     }
-    fn go(&mut self, dir: Direction, solo:bool) {
+    fn go(&mut self, dir: Direction, solo:bool, map:Vec<Vec<char>>) {
         if solo{
             match dir {
-                Direction::Up => self.pos.y -= 1,
-                Direction::Down => self.pos.y += 1,
-                Direction::Left => self.pos.x -= 1,
-                Direction::Right => self.pos.x += 1,
+                Direction::Up => if self.pos.y >= 0 && map[self.pos.x as usize][self.pos.y as usize-1] != '#' && self.pos.y<= 30 {self.pos.y -= 1},
+                Direction::Down => if self.pos.y >= 0 && map[self.pos.x as usize][self.pos.y as usize+1] != '#' && self.pos.y<= 30 {self.pos.y += 1},
+                Direction::Left => if self.pos.x >= 0 && map[self.pos.x as usize -1][self.pos.y as usize] != '#' && self.pos.x<= 30 {self.pos.x -= 1},
+                Direction::Right => if self.pos.x >= 0 && map[self.pos.x as usize +1][self.pos.y as usize] != '#' && self.pos.x<= 30 {self.pos.x += 1},
                 _ => {}
             }
         }else{
             match dir {
-                Direction::Up => self.pos.y -= 1,
-                Direction::Down => self.pos.y += 1,
-                Direction::Left => self.pos.x -= 1,
-                Direction::Right => self.pos.x += 1,
+                Direction::Up => if self.pos.y >= 0 && map[self.pos.x as usize][self.pos.y as usize-1] != '#' && self.pos.y<= 30 {self.pos.y -= 1},
+                Direction::Down => if self.pos.y >= 0 && map[self.pos.x as usize][self.pos.y as usize+1] != '#' && self.pos.y<= 30 {self.pos.y += 1},
+                Direction::Left => if self.pos.x >= 0 && map[self.pos.x as usize -1][self.pos.y as usize] != '#' && self.pos.x<= 30 {self.pos.x -= 1},
+                Direction::Right => if self.pos.x >= 0 && map[self.pos.x as usize +1][self.pos.y as usize] != '#' && self.pos.x<= 30 {self.pos.x += 1},
                 _ => {}
             }
         }
@@ -572,7 +572,7 @@ impl EventHandler for MyGame {
     fn key_down_event(&mut self, ctx: &mut Context, input: KeyInput, _repeated: bool) -> Result<(), GameError> {
         if let Some(dir) = input.keycode.and_then(Direction::from_keycode) {
             if !self.draw_menu.in_menu {
-                self.player.go(dir, self.solo);
+                self.player.go(dir, self.solo,self.map.clone());
             }else{
                 self.draw_menu.go(dir);
             }
