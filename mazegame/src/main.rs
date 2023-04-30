@@ -1,3 +1,4 @@
+mod server;
 
 use ggez::{Context, ContextBuilder, GameError, GameResult, input::keyboard::KeyCode};
 use ggez::graphics::{self, Color, Rect};
@@ -11,9 +12,10 @@ use rand::prelude::ThreadRng;
 use rand::seq::SliceRandom;
 
 use std::collections::VecDeque;
-use std::net::{TcpListener, TcpStream}; // line 10..12 socket, thread 관련 lib 추가
-use std::io::{BufRead, BufReader, Write};
-use std::thread;
+use std::net::{Shutdown, TcpListener, TcpStream}; // line 10..12 socket, thread 관련 lib 추가
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
+use std::{io, thread};
+use std::str::from_utf8;
 
 const MAP_SIZE: usize = 30;
 const WALL: char = '#';
@@ -26,7 +28,7 @@ static mut bomb_row: usize = 0;
 static mut bomb_col: usize = 0;
 static mut exit_row: usize = 0;
 static mut exit_col: usize = 0;
-
+static mut server_true: bool = false;
 const DESIRED_FPS: u32 = 8;
 
 unsafe fn init_map() -> Vec<Vec<char>> {
@@ -118,15 +120,13 @@ struct MyGame {
     draw_menu: Menu,
     solo:bool,
     mulit_player:Player,
+    socket_client: Option<TcpStream>,
+    first: bool,
 }
 
 impl MyGame {
     pub unsafe fn new(
-        x: &mut Context,
-        stream: TcpStream,
-        server_flag: bool
-
-    ) -> Self {
+        x: &mut Context) -> Self {
         let wall_pos = GridPosition { x: 0, y: 0 };
         MyGame {
             wall: Wall::new(wall_pos, false),
@@ -137,10 +137,46 @@ impl MyGame {
             draw_menu: Menu::new(0, vec!["Solo".to_string(), "Multi".to_string(), "Join".to_string(), "Exit".to_string()]),
             solo: true,
             mulit_player: Player::new(GridPosition { x: (player_row) as i16, y: (player_col) as i16 }),
+            socket_client: None,
+            first: true,
         }
     }
     fn update_multi(&mut self,solo:bool){
         self.solo = solo;
+    }
+    fn make_socket_server(&mut self, user_type:bool) -> io::Result<()>{
+        if user_type{
+
+
+        }
+        Ok(())
+
+    }
+    fn handle_client(mut stream: TcpStream){
+        let mut data = [0 as u8; 50]; // using 50 byte buffer
+        while match stream.read(&mut data) {
+            Ok(size) => {
+                // echo everything!
+                // stream.write(&data[0..size]).unwrap();
+                println!("{}", String::from_utf8_lossy(&data[0..size]));
+                true
+            }
+            Err(_) => {
+                println!("An error occurred, terminating connection with {}", stream.peer_addr().unwrap());
+                stream.shutdown(Shutdown::Both).unwrap();
+                false
+            }
+        } {}
+    }
+    fn client_connect(&mut self, url: &str){
+        self.socket_client = (TcpStream::connect(url)
+            .map_err(|e| {
+                io::Error::new(
+                    ErrorKind::Other,
+                    format!("Failed to connect to server: {}", e),
+                )
+            })
+            .ok());
     }
 }
 
@@ -181,10 +217,11 @@ struct Menu{
     list: Vec<String>,
     in_menu: bool,
     solo: bool,
+    user_type: bool,
 }
 impl Menu{
     pub fn new(select:i32, list: Vec<String>) -> Self{
-        Menu{select, pos: [910.0, 500.0], list, in_menu: true, solo: true}
+        Menu{select, pos: [910.0, 500.0], list, in_menu: true, solo: true, user_type: false}
     }
     fn draw(&self, canvas: &mut graphics::Canvas){
         if !self.in_menu{
@@ -229,9 +266,11 @@ impl Menu{
         }else if self.select == 1 {
             self.in_menu = false;
             self.solo = false;
+            self.user_type = true;
             //add multi action
         }else if self.select == 2 {
             self.in_menu = false;
+            self.solo = false;
             //add join action
         }else if self.select == 3 {
             std::process::exit(0);
@@ -419,6 +458,9 @@ impl Player {
     fn update(&mut self, can : bool){
         self.can = can;
     }
+    fn update_pos(&mut self, pos : GridPosition){
+        self.pos = pos;
+    }
 }
 
 struct Wall {
@@ -551,7 +593,52 @@ impl EventHandler for MyGame {
             if !self.draw_menu.in_menu {
                 self.solo = self.draw_menu.solo;
                 if !self.solo{
+                    if self.draw_menu.user_type && self.first{
+                        self.first = false;
+                        unsafe {
+                            server_true = true;
+                        }
+
+                        self.client_connect("127.0.0.1:8080");
+
+                    }else if self.first{
+                        self.first = false;
+                        self.client_connect("127.0.0.1:8080");
+                    }
                     self.mulit_player.update(true);
+
+                    let player_pos_bytes_x = self.player.pos.x.to_be_bytes();
+                    let player_pos_bytes_y = self.player.pos.y.to_be_bytes();
+                    let mut player_pos_bytes = [&player_pos_bytes_x[..], &player_pos_bytes_y[..]].concat();
+                    unsafe {
+                        if let Some(server_socket) = &mut self.socket_client {
+                            // println!("{:?}", player_pos_bytes);
+                            server_socket
+                                .write_all(&player_pos_bytes)
+                                .map_err(|e| {
+                                    io::Error::new(
+                                        ErrorKind::Other,
+                                        format!("Failed to send player position to server: {}", e),
+                                    )
+                                })?;
+                        }
+                    }
+
+                    let mut buffer = [0u8; 4];
+                    unsafe {
+                        if let Some(server_socket) = &mut self.socket_client {
+                            server_socket.read_exact(&mut buffer).map_err(|e| {
+                                io::Error::new(
+                                    ErrorKind::Other,
+                                    format!("Failed to receive data from server: {}", e),
+                                )
+                            })?;
+                            // println!("{:?}", buffer);
+                        }
+                    }
+                    self.mulit_player.pos.x = i16::from_be_bytes(buffer[0..2].try_into().unwrap());
+                    self.mulit_player.pos.y = i16::from_be_bytes(buffer[2..4].try_into().unwrap());
+
                 }
                 self.wall.update(true);
                 self.player.update(true);
@@ -591,38 +678,23 @@ impl EventHandler for MyGame {
 }
 
 
+
 fn main() {
+    let handle = thread::spawn(move || unsafe {
+        loop{
+            if server_true{
+                server::make_socket_server().expect("TODO: panic message");
+                break;
+            }
+        }
+
+
+    });
     let (mut ctx, event_loop) = ContextBuilder::new("my_game", "Cool Game Author")
         .window_mode(ggez::conf::WindowMode::default().dimensions(1900.0, 1200.0))
         .build()
         .expect("aieee, could not create ggez context!");
-
-    // Create an instance of your event handler.
-    // Usually, you should provide it with the Context object to
-    // use when setting your game up.
-    let mut server_flag = false;
-    let tcp_stream = match TcpListener::bind("127.0.0.1:8081") {
-      Ok(res) => {
-          println!("Server: 127.0.0.1:8081");
-          let mut incoming_streams = res.incoming();
-          let stream = incoming_streams.next().unwrap().unwrap();
-          let peer_ip_address = stream.peer_addr().unwrap();
-          println!("connected {}", peer_ip_address);
-          stream.set_nonblocking(true).unwrap();
-          server_flag = true;
-          stream
-      }
-        Err(err) => {
-            println!("Client: 127.0.0.1:8082");
-            let stream = TcpStream::connect("127.0.0.1:8081").unwrap();
-            let peer_ip_address = stream.peer_addr().unwrap();
-            println!("connected {}", peer_ip_address);
-            stream.set_nonblocking(true).unwrap();
-            stream
-        }
-    };
-
-    let my_game = unsafe { MyGame::new(&mut ctx, tcp_stream, server_flag) };
+    let my_game = unsafe { MyGame::new(&mut ctx) };
     // Run!
     event::run(ctx, event_loop, my_game);
 
