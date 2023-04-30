@@ -11,7 +11,7 @@ use std::net::{TcpListener, TcpStream}; // line 10..12 socket, thread 관련 lib
 use std::io::{BufRead, BufReader, Write};
 use std::thread;
 
-const MAP_SIZE: usize = 10;
+const MAP_SIZE: usize = 30;
 const WALL: char = '#';
 const PLAYER: char = 'P';
 const EXIT: char = 'E';
@@ -113,7 +113,7 @@ impl MyGame {
         MyGame {
             wall: Wall::new(wall_pos),
             map: init_map(),
-            player: Player::new(GridPosition { x: (player_col * 80) as i16, y: (player_row * 80) as i16 }),
+            player: Player::new(GridPosition { x: (player_col * 40) as i16, y: (player_row * 40) as i16 }),
             bomb: Bomb::new(GridPosition { x: 0, y: 0 }),
             exit: Exit::new(GridPosition { x: 0, y: 0 }),
         }
@@ -163,8 +163,8 @@ impl Exit {
                 .dest_rect(Rect::new(
                     x,
                     y,
-                    80.0,
-                    80.0,
+                    40.0,
+                    40.0,
                 ))
                 .color(Color::YELLOW), );
     }
@@ -186,8 +186,8 @@ impl Bomb {
                 .dest_rect(Rect::new(
                     x,
                     y,
-                    80.0,
-                    80.0,
+                    40.0,
+                    40.0,
                 ))
                 .color(Color::RED), );
     }
@@ -211,8 +211,8 @@ impl Player {
                 .dest_rect(Rect::new(
                     self.pos.x as f32,
                     self.pos.y as f32,
-                    80.0,
-                    80.0,
+                    40.0,
+                    40.0,
                 ))
                 .color(Color::GREEN), );
     }
@@ -263,8 +263,8 @@ impl Wall {
                 .dest_rect(Rect::new(
                     x,
                     y,
-                    80.0,
-                    80.0,
+                    40.0,
+                    40.0,
                 ))
                 .color(Color::BLACK), );
     }
@@ -281,17 +281,17 @@ impl EventHandler for MyGame {
         for i in 0..MAP_SIZE {
             for j in 0..MAP_SIZE {
                 if self.map[i][j] == '#' {
-                    self.wall.draw(&mut canvas, (j * 80) as f32, (i * 80) as f32);
+                    self.wall.draw(&mut canvas, (j * 40) as f32, (i * 40) as f32);
                 }
                 if self.map[i][j] == 'P' {
                     self.player.draw(&mut canvas);
 
                 }
                 if self.map[i][j] == '*' {
-                    self.bomb.draw(&mut canvas, (j * 80) as f32, (i * 80) as f32);
+                    self.bomb.draw(&mut canvas, (j * 40) as f32, (i * 40) as f32);
                 }
                 if self.map[i][j] == 'E' {
-                    self.exit.draw(&mut canvas, (j * 80) as f32, (i * 80) as f32);
+                    self.exit.draw(&mut canvas, (j * 40) as f32, (i * 40) as f32);
                 }
             }
         }
@@ -356,7 +356,7 @@ impl TcpServer {
 
 fn main() {
     let (mut ctx, event_loop) = ContextBuilder::new("my_game", "Cool Game Author")
-        .window_mode(ggez::conf::WindowMode::default().dimensions(800.0, 800.0))
+        .window_mode(ggez::conf::WindowMode::default().dimensions(1200.0, 1200.0))
         .build()
         .expect("aieee, could not create ggez context!");
 
