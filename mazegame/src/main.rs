@@ -218,10 +218,10 @@ impl Player {
     }
     fn go(&mut self, dir: Direction) {
         match dir {
-            Direction::Up => self.pos.y -= 10,
-            Direction::Down => self.pos.y += 10,
-            Direction::Left => self.pos.x -= 10,
-            Direction::Right => self.pos.x += 10,
+            Direction::Up => self.pos.y -= 40,
+            Direction::Down => self.pos.y += 40,
+            Direction::Left => self.pos.x -= 40,
+            Direction::Right => self.pos.x += 40,
         }
     }
 }
