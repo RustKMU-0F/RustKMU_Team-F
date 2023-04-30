@@ -113,6 +113,8 @@ struct MyGame {
     bomb: Bomb,
     exit: Exit,
     draw_menu: Menu,
+    solo:bool,
+    mulit_player:Player,
 }
 
 impl MyGame {
@@ -121,11 +123,16 @@ impl MyGame {
         MyGame {
             wall: Wall::new(wall_pos, false),
             map: init_map(),
-            player: Player::new(GridPosition { x: (player_row * 40) as i16, y: (player_col * 40) as i16 }),
-            bomb: Bomb::new(GridPosition { x: (bomb_row * 40 ) as i16, y: (bomb_col * 40) as i16 }),
-            exit: Exit::new(GridPosition { x: (exit_row * 40 ) as i16, y: (exit_col * 40 )as i16 }),
+            player: Player::new(GridPosition { x: (player_row) as i16, y: (player_col) as i16 }),
+            bomb: Bomb::new(GridPosition { x: (bomb_row) as i16, y: (bomb_col) as i16 }),
+            exit: Exit::new(GridPosition { x: (exit_row  ) as i16, y: (exit_col  )as i16 }),
             draw_menu: Menu::new(0, vec!["Solo".to_string(), "Multi".to_string(), "Join".to_string(), "Exit".to_string()]),
+            solo: true,
+            mulit_player: Player::new(GridPosition { x: (player_row) as i16, y: (player_col) as i16 }),
         }
+    }
+    fn update_multi(&mut self,solo:bool){
+        self.solo = solo;
     }
 }
 
@@ -165,16 +172,17 @@ struct Menu{
     pos: [f32;2],
     list: Vec<String>,
     in_menu: bool,
+    solo: bool,
 }
 impl Menu{
     pub fn new(select:i32, list: Vec<String>) -> Self{
-        Menu{select, pos: [560.0, 500.0], list, in_menu: true}
+        Menu{select, pos: [910.0, 500.0], list, in_menu: true, solo: true}
     }
     fn draw(&self, canvas: &mut graphics::Canvas){
         if !self.in_menu{
             return;
         }
-        let x = 600.0;
+        let x = 950.0;
         let mut y = 500.0;
         for i in 0..4{
             let text = graphics::Text::new(self.list[i].clone());
@@ -212,6 +220,7 @@ impl Menu{
             self.in_menu = false;
         }else if self.select == 1 {
             self.in_menu = false;
+            self.solo = false;
             //add multi action
         }else if self.select == 2 {
             self.in_menu = false;
@@ -231,18 +240,42 @@ impl Exit {
     pub fn new(pos: GridPosition) -> Self {
         Exit { pos, can: false }
     }
-    fn draw(&self, canvas: &mut graphics::Canvas) {
+    fn draw(&self, canvas: &mut graphics::Canvas, solo:bool) {
         if self.can{
-            canvas.draw(
-                &graphics::Quad,
-                graphics::DrawParam::new()
-                    .dest_rect(Rect::new(
-                        self.pos.x as f32,
-                        self.pos.y as f32,
-                        40.0,
-                        40.0,
-                    ))
-                    .color(Color::YELLOW), );
+            if solo{
+                canvas.draw(
+                    &graphics::Quad,
+                    graphics::DrawParam::new()
+                        .dest_rect(Rect::new(
+                            ((self.pos.x * 40) + 350) as f32,
+                            (self.pos.y * 40)  as f32,
+                            40.0,
+                            40.0,
+                        ))
+                        .color(Color::YELLOW), );
+            }else{
+                canvas.draw(
+                    &graphics::Quad,
+                    graphics::DrawParam::new()
+                        .dest_rect(Rect::new(
+                            ((self.pos.x * 30)) as f32,
+                            (self.pos.y * 40)  as f32,
+                            30.0,
+                            40.0,
+                        ))
+                        .color(Color::YELLOW), );
+                canvas.draw(
+                    &graphics::Quad,
+                    graphics::DrawParam::new()
+                        .dest_rect(Rect::new(
+                            ((self.pos.x * 30) + 1000) as f32,
+                            (self.pos.y * 40)  as f32,
+                            30.0,
+                            40.0,
+                        ))
+                        .color(Color::YELLOW), );
+            }
+
         }
     }
     fn update(&mut self, can : bool){
@@ -260,18 +293,41 @@ impl Bomb {
     pub fn new(pos: GridPosition) -> Self {
         Bomb { pos, timer: 0.0 , can: false}
     }
-    fn draw(&self, canvas: &mut graphics::Canvas) {
+    fn draw(&self, canvas: &mut graphics::Canvas, solo:bool) {
         if self.can{
-            canvas.draw(
-                &graphics::Quad,
-                graphics::DrawParam::new()
-                    .dest_rect(Rect::new(
-                        self.pos.x as f32,
-                        self.pos.y as f32,
-                        40.0,
-                        40.0,
-                    ))
-                    .color(Color::RED), );
+            if solo{
+                canvas.draw(
+                    &graphics::Quad,
+                    graphics::DrawParam::new()
+                        .dest_rect(Rect::new(
+                            ((self.pos.x*40) + 350) as f32,
+                            (self.pos.y * 40 ) as f32,
+                            40.0,
+                            40.0,
+                        ))
+                        .color(Color::RED), );
+            }else{
+                canvas.draw(
+                    &graphics::Quad,
+                    graphics::DrawParam::new()
+                        .dest_rect(Rect::new(
+                            (self.pos.x * 30) as f32,
+                            (self.pos.y * 40 ) as f32,
+                            30.0,
+                            40.0,
+                        ))
+                        .color(Color::RED), );
+                canvas.draw(
+                    &graphics::Quad,
+                    graphics::DrawParam::new()
+                        .dest_rect(Rect::new(
+                            ((self.pos.x * 30) + 1000) as f32,
+                            (self.pos.y * 40) as f32,
+                            30.0,
+                            40.0,
+                        ))
+                        .color(Color::RED), );
+            }
         }
 
     }
@@ -292,29 +348,65 @@ impl Player {
     pub fn new(pos: GridPosition) -> Self {
         Player { pos, can: false}
     }
-    fn draw(&self, canvas: &mut graphics::Canvas) {
+    fn draw(&self, canvas: &mut graphics::Canvas, solo:bool,multi:bool) {
         if self.can{
-            canvas.draw(
-                &graphics::Quad,
-                graphics::DrawParam::new()
-                    .dest_rect(Rect::new(
-                        self.pos.x as f32,
-                        self.pos.y as f32,
-                        40.0,
-                        40.0,
-                    ))
-                    .color(Color::GREEN), );
+            if solo{
+                canvas.draw(
+                    &graphics::Quad,
+                    graphics::DrawParam::new()
+                        .dest_rect(Rect::new(
+                            ((self.pos.x * 40) + 350) as f32,
+                            (self.pos.y * 40)  as f32,
+                            40.0,
+                            40.0,
+                        ))
+                        .color(Color::GREEN), );
+            }else if multi{
+                canvas.draw(
+                    &graphics::Quad,
+                    graphics::DrawParam::new()
+                        .dest_rect(Rect::new(
+                            ((self.pos.x * 30) +1000) as f32,
+                            (self.pos.y * 40) as f32,
+                            30.0,
+                            40.0,
+                        ))
+                        .color(Color::GREEN), );
+            }else{
+                canvas.draw(
+                    &graphics::Quad,
+                    graphics::DrawParam::new()
+                        .dest_rect(Rect::new(
+                            (self.pos.x * 30) as f32,
+                            (self.pos.y * 40)  as f32,
+                            30.0,
+                            40.0,
+                        ))
+                        .color(Color::GREEN), );
+            }
+
         }
 
     }
-    fn go(&mut self, dir: Direction) {
-        match dir {
-            Direction::Up => self.pos.y -= 40,
-            Direction::Down => self.pos.y += 40,
-            Direction::Left => self.pos.x -= 40,
-            Direction::Right => self.pos.x += 40,
-            _ => {}
+    fn go(&mut self, dir: Direction, solo:bool) {
+        if solo{
+            match dir {
+                Direction::Up => self.pos.y -= 1,
+                Direction::Down => self.pos.y += 1,
+                Direction::Left => self.pos.x -= 1,
+                Direction::Right => self.pos.x += 1,
+                _ => {}
+            }
+        }else{
+            match dir {
+                Direction::Up => self.pos.y -= 1,
+                Direction::Down => self.pos.y += 1,
+                Direction::Left => self.pos.x -= 1,
+                Direction::Right => self.pos.x += 1,
+                _ => {}
+            }
         }
+
     }
     fn update(&mut self, can : bool){
         self.can = can;
@@ -354,25 +446,93 @@ impl Wall {
     fn update(&mut self, can : bool){
         self.can = can;
     }
-    fn draw(&self, canvas: &mut graphics::Canvas, map: &Vec<Vec<char>>) {
+    fn draw(&self, canvas: &mut graphics::Canvas, map: &Vec<Vec<char>>,solo:bool) {
         if self.can{
-            for i in 0..MAP_SIZE {
-                for j in 0..MAP_SIZE {
-                    if map[i][j] == '#' {
-                        canvas.draw(
-                            &graphics::Quad,
-                            graphics::DrawParam::new()
-                                .dest_rect(Rect::new(
-                                    (i * 40) as f32,
-                                    (j * 40) as f32,
-                                    40.0,
-                                    40.0,
-                                ))
-                                .color(Color::BLACK), );
-                    }
+            if solo{
+                for i in 0..MAP_SIZE {
+                    for j in 0..MAP_SIZE {
+                        if map[i][j] == '#' {
+                            canvas.draw(
+                                &graphics::Quad,
+                                graphics::DrawParam::new()
+                                    .dest_rect(Rect::new(
+                                        ((i * 40) + 350) as f32,
+                                        (j * 40) as f32,
+                                        40.0,
+                                        40.0,
+                                    ))
+                                    .color(Color::BLACK), );
+                        }
 
+                    }
+                }
+                canvas.draw(
+                    &graphics::Quad,
+                    graphics::DrawParam::new()
+                        .dest_rect(Rect::new(
+                            0.0 as f32,
+                            0.0  as f32,
+                            350.0,
+                            1200.0,
+                        ))
+                        .color(Color::BLACK), );
+                canvas.draw(
+                    &graphics::Quad,
+                    graphics::DrawParam::new()
+                        .dest_rect(Rect::new(
+                            1550.0 as f32,
+                            0.0  as f32,
+                            350.0,
+                            1200.0,
+                        ))
+                        .color(Color::BLACK), );
+            }else{
+                for i in 0..MAP_SIZE {
+                    for j in 0..MAP_SIZE {
+                        if map[i][j] == '#' {
+                            canvas.draw(
+                                &graphics::Quad,
+                                graphics::DrawParam::new()
+                                    .dest_rect(Rect::new(
+                                        (i * 30) as f32,
+                                        (j * 40) as f32,
+                                        30.0,
+                                        40.0,
+                                    ))
+                                    .color(Color::BLACK), );
+                        }
+
+                    }
+                }
+                canvas.draw(
+                    &graphics::Quad,
+                    graphics::DrawParam::new()
+                        .dest_rect(Rect::new(
+                            900.0 as f32,
+                            0.0  as f32,
+                            100.0,
+                            1200.0,
+                        ))
+                        .color(Color::BLACK), );
+                for i in 0..MAP_SIZE {
+                    for j in 0..MAP_SIZE {
+                        if map[i][j] == '#' {
+                            canvas.draw(
+                                &graphics::Quad,
+                                graphics::DrawParam::new()
+                                    .dest_rect(Rect::new(
+                                        ((i * 30) + 1000) as f32,
+                                        (j * 40) as f32,
+                                        30.0,
+                                        40.0,
+                                    ))
+                                    .color(Color::BLACK), );
+                        }
+
+                    }
                 }
             }
+
         }
     }
 }
@@ -381,11 +541,14 @@ impl EventHandler for MyGame {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
         while _ctx.time.check_update_time(DESIRED_FPS) {
             if !self.draw_menu.in_menu {
+                self.solo = self.draw_menu.solo;
+                if !self.solo{
+                    self.mulit_player.update(true);
+                }
                 self.wall.update(true);
                 self.player.update(true);
                 self.exit.update(true);
                 self.bomb.update(true);
-
             }
         }
 
@@ -396,10 +559,11 @@ impl EventHandler for MyGame {
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
         let mut canvas = graphics::Canvas::from_frame(ctx, Color::WHITE);
 
-        self.wall.draw(&mut canvas, &self.map);
-        self.player.draw(&mut canvas);
-        self.exit.draw(&mut canvas);
-        self.bomb.draw(&mut canvas);
+        self.wall.draw(&mut canvas, &self.map, self.solo);
+        self.player.draw(&mut canvas, self.solo, false);
+        self.mulit_player.draw(&mut canvas, self.solo, true);
+        self.exit.draw(&mut canvas, self.solo);
+        self.bomb.draw(&mut canvas, self.solo);
         self.draw_menu.draw(&mut canvas);
         canvas.finish(ctx)?;
 
@@ -408,8 +572,7 @@ impl EventHandler for MyGame {
     fn key_down_event(&mut self, ctx: &mut Context, input: KeyInput, _repeated: bool) -> Result<(), GameError> {
         if let Some(dir) = input.keycode.and_then(Direction::from_keycode) {
             if !self.draw_menu.in_menu {
-                self.player.go(dir);
-
+                self.player.go(dir, self.solo);
             }else{
                 self.draw_menu.go(dir);
             }
@@ -468,7 +631,7 @@ impl TcpServer {
 
 fn main() {
     let (mut ctx, event_loop) = ContextBuilder::new("my_game", "Cool Game Author")
-        .window_mode(ggez::conf::WindowMode::default().dimensions(1200.0, 1200.0))
+        .window_mode(ggez::conf::WindowMode::default().dimensions(1900.0, 1200.0))
         .build()
         .expect("aieee, could not create ggez context!");
 
