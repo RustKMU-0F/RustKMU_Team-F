@@ -2,12 +2,15 @@
 use ggez::{Context, ContextBuilder, GameError, GameResult, input::keyboard::KeyCode};
 use ggez::graphics::{self, Color, Rect};
 use ggez::event::{self, EventHandler};
+use ggez::input::keyboard::KeyInput;
+
 use oorandom::Rand32;
+
 use rand::{Rng, thread_rng};
 use rand::prelude::ThreadRng;
 use rand::seq::SliceRandom;
+
 use std::collections::VecDeque;
-use ggez::input::keyboard::KeyInput;
 use std::net::{TcpListener, TcpStream}; // line 10..12 socket, thread 관련 lib 추가
 use std::io::{BufRead, BufReader, Write};
 use std::thread;
@@ -118,7 +121,12 @@ struct MyGame {
 }
 
 impl MyGame {
-    pub unsafe fn new(x: &mut Context) -> Self {
+    pub unsafe fn new(
+        x: &mut Context,
+        stream: TcpStream,
+        server_flag: bool
+
+    ) -> Self {
         let wall_pos = GridPosition { x: 0, y: 0 };
         MyGame {
             wall: Wall::new(wall_pos, false),
@@ -581,52 +589,6 @@ impl EventHandler for MyGame {
         Ok(())
     }
 }
-// ----------------  TCP socket  --------------
-struct TcpServer {
-    listener: TcpListener,
-}
-
-impl TcpServer {
-    fn new(addr: &str) -> Result<Self, std::io::Error> {
-        let listener = TcpListener::bind(addr)?;
-        Ok(Self { listener })
-    }
-
-    fn run(&self) -> std::io::Result<()> {
-        for stream in self.listener.incoming() {
-            match stream {
-                Ok(stream) => {
-                    self.handle_client(stream);
-                }
-                Err(e) => {
-                    println!("Error: {}", e);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn handle_client(&self, stream: TcpStream) {
-        let mut reader = BufReader::new(stream.try_clone().unwrap());
-        let mut writer = stream.try_clone().unwrap();
-
-        loop {
-            let mut input = String::new();
-            reader.read_line(&mut input).unwrap();
-
-            let trimmed = input.trim();
-            println!("Received: {}", trimmed);
-
-            if trimmed == "exit" {
-                writer.write_all(b"Goodbye!\n").unwrap();
-                break;
-            }
-
-            writer.write_all(trimmed.as_bytes()).unwrap();
-            writer.write_all(b"\n").unwrap();
-        }
-    }
-}
 
 
 fn main() {
@@ -638,26 +600,30 @@ fn main() {
     // Create an instance of your event handler.
     // Usually, you should provide it with the Context object to
     // use when setting your game up.
-    let my_game = unsafe { MyGame::new(&mut ctx) };
+    let mut server_flag = false;
+    let tcp_stream = match TcpListener::bind("127.0.0.1:8081") {
+      Ok(res) => {
+          println!("Server: 127.0.0.1:8081");
+          let mut incoming_streams = res.incoming();
+          let stream = incoming_streams.next().unwrap().unwrap();
+          let peer_ip_address = stream.peer_addr().unwrap();
+          println!("connected {}", peer_ip_address);
+          stream.set_nonblocking(true).unwrap();
+          server_flag = true;
+          stream
+      }
+        Err(err) => {
+            println!("Client: 127.0.0.1:8082");
+            let stream = TcpStream::connect("127.0.0.1:8081").unwrap();
+            let peer_ip_address = stream.peer_addr().unwrap();
+            println!("connected {}", peer_ip_address);
+            stream.set_nonblocking(true).unwrap();
+            stream
+        }
+    };
 
+    let my_game = unsafe { MyGame::new(&mut ctx, tcp_stream, server_flag) };
     // Run!
     event::run(ctx, event_loop, my_game);
-
-    // 로컬호스트 사용해서 테스트
-    let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                let server = TcpServer { listener: listener.try_clone().unwrap() };
-                thread::spawn(move || {
-                    server.handle_client(stream);
-                });
-                println!("Listening OK")
-            }
-            Err(e) => {
-                println!("Error: {}", e);
-            }
-        }
-    }
 
 }
