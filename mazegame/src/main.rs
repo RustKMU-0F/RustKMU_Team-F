@@ -15,6 +15,7 @@ use std::collections::VecDeque;
 use std::net::{Shutdown, TcpListener, TcpStream}; // line 10..12 socket, thread 관련 lib 추가
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::{io, thread};
+use std::fs::File;
 use std::str::from_utf8;
 
 const MAP_SIZE: usize = 30;
@@ -133,6 +134,8 @@ struct MyGame {
     mulit_player:Player,
     socket_client: Option<TcpStream>,
     first: bool,
+    timer: timer,
+    end: bool,
 }
 
 impl MyGame {
@@ -150,6 +153,8 @@ impl MyGame {
             mulit_player: Player::new(GridPosition { x: (player_row) as i16, y: (player_col) as i16 }),
             socket_client: None,
             first: true,
+            timer: timer::new(),
+            end: false,
         }
     }
     fn update_multi(&mut self,solo:bool){
@@ -182,15 +187,28 @@ impl MyGame {
             }
         } {}
     }
-    fn client_connect(&mut self, url: &str){
-        self.socket_client = (TcpStream::connect(url)
-            .map_err(|e| {
-                io::Error::new(
-                    ErrorKind::Other,
-                    format!("Failed to connect to server: {}", e),
-                )
-            })
-            .ok());
+    fn client_connect(&mut self, url: &str, task:bool){
+        if task{
+            self.socket_client = (TcpStream::connect(url)
+                .map_err(|e| {
+                    io::Error::new(
+                        ErrorKind::Other,
+                        format!("Failed to connect to server: {}", e),
+                    )
+                })
+                .ok());
+        }else{
+            drop(self.socket_client.take());
+        }
+
+    }
+
+    fn end_game(&mut self) {
+        if self.map[self.player.pos.x as usize][self.player.pos.y as usize] == 'E'{
+            self.end = true;
+        }else if self.map[self.player.pos.x as usize][self.player.pos.y as usize] == '*'{
+            self.end = true;
+        }
     }
 }
 
@@ -222,6 +240,31 @@ impl Direction {
             KeyCode::Return => Some(Direction::Return),
             _ => None,
         }
+    }
+}
+struct timer{
+    time: f32,
+}
+impl timer{
+    pub fn new() -> Self{
+        timer{time: 0.0}
+    }
+    fn update(&mut self, dt: f32){
+        self.time += dt;
+
+    }
+    fn get_time(&self) -> f32{
+        self.time
+    }
+    fn draw(&self, canvas: &mut graphics::Canvas){
+        let text = graphics::Text::new(format!("{}", self.time));
+        let coord = [0.0, 0.0] ;
+        canvas.draw(
+            &text,
+            graphics::DrawParam::new()
+                .dest(coord)
+                .color(graphics::Color::WHITE),
+        );
     }
 }
 
@@ -452,18 +495,22 @@ impl Player {
     fn go(&mut self, dir: Direction, solo:bool, map:Vec<Vec<char>>) {
         if solo{
             match dir {
-                Direction::Up => if self.pos.y >= 0 && self.pos.y<= 30 && map[self.pos.x as usize][self.pos.y as usize-1] != '#'  {self.pos.y -= 1},
-                Direction::Down => if self.pos.y >= 0 && self.pos.y < 29 && map[self.pos.x as usize][self.pos.y as usize+1] != '#' {self.pos.y += 1},
-                Direction::Left => if self.pos.x >= 0 && self.pos.x <= 30 && map[self.pos.x as usize -1][self.pos.y as usize] != '#' {self.pos.x -= 1},
-                Direction::Right => if self.pos.x >= 0 && self.pos.x < 29 && map[self.pos.x as usize +1][self.pos.y as usize] != '#' {self.pos.x += 1},
+
+                Direction::Up => if self.pos.y > 0 && map[self.pos.x as usize][self.pos.y as usize-1] != '#' && self.pos.y<= 30 {self.pos.y -= 1},
+                Direction::Down => if self.pos.y < 29  && map[self.pos.x as usize][self.pos.y as usize+1] != '#' && self.pos.y<= 30 {self.pos.y += 1},
+                Direction::Left => if self.pos.x > 0 && map[self.pos.x as usize -1][self.pos.y as usize] != '#' && self.pos.x<= 30 {self.pos.x -= 1},
+                Direction::Right => if self.pos.x < 29 && map[self.pos.x as usize +1][self.pos.y as usize] != '#' && self.pos.x<= 30 {self.pos.x += 1},
+
                 _ => {}
             }
         }else{
             match dir {
-                Direction::Up => if self.pos.y >= 0 && self.pos.y<= 30 && map[self.pos.x as usize][self.pos.y as usize-1] != '#' {self.pos.y -= 1},
-                Direction::Down => if self.pos.y >= 0 && self.pos.y < 29 && map[self.pos.x as usize][self.pos.y as usize+1] != '#'  {self.pos.y += 1},
-                Direction::Left => if self.pos.x >= 0 && self.pos.x<= 30 && map[self.pos.x as usize -1][self.pos.y as usize] != '#'  {self.pos.x -= 1},
-                Direction::Right => if self.pos.x >= 0 && self.pos.x < 29 && map[self.pos.x as usize +1][self.pos.y as usize] != '#'  {self.pos.x += 1},
+
+                Direction::Up => if self.pos.y > 0 && map[self.pos.x as usize][self.pos.y as usize-1] != '#' && self.pos.y<= 30 {self.pos.y -= 1},
+                Direction::Down => if self.pos.y < 29 && map[self.pos.x as usize][self.pos.y as usize+1] != '#' && self.pos.y<= 30 {self.pos.y += 1},
+                Direction::Left => if self.pos.x > 0 && map[self.pos.x as usize -1][self.pos.y as usize] != '#' && self.pos.x<= 30 {self.pos.x -= 1},
+                Direction::Right => if self.pos.x < 29 && map[self.pos.x as usize +1][self.pos.y as usize] != '#' && self.pos.x<= 30 {self.pos.x += 1},
+
                 _ => {}
             }
         }
@@ -472,9 +519,12 @@ impl Player {
     fn update(&mut self, can : bool){
         self.can = can;
     }
+
     fn update_pos(&mut self, pos : GridPosition){
         self.pos = pos;
     }
+
+
 }
 
 struct Wall {
@@ -605,12 +655,13 @@ impl EventHandler for MyGame {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
 
             if !self.draw_menu.in_menu {
+                self.timer.update(0.01);
                 self.solo = self.draw_menu.solo;
                 if !self.solo {
                     if self.first && self.draw_menu.user_type{
                         self.first = false;
                         println!("asd");
-                        self.client_connect("127.0.0.1:8088");
+                        self.client_connect("127.0.0.1:8088",true);
                         println!("asd");
                         self.mulit_player.update(true);
                         let maze_flat = self.map.iter().flatten().map(|&c| c as u8).collect::<Vec<u8>>();
@@ -632,7 +683,7 @@ impl EventHandler for MyGame {
                     if self.first {
                         self.first = false;
                         println!("asd");
-                        self.client_connect("127.0.0.1:8088");
+                        self.client_connect("127.0.0.1:8088",true);
                         println!("asd");
                         self.mulit_player.update(true);
                         let mut buffer = [0u8; 900];
@@ -692,6 +743,23 @@ impl EventHandler for MyGame {
                 self.player.update(true);
                 self.exit.update(true);
                 self.bomb.update(true);
+                self.end_game();
+                if self.end {
+                    let mut file = File::create("score.txt");
+                    file?.write_all(self.timer.time.to_string().as_bytes()).expect("Failed to write to file");
+
+
+                    if !self.solo{
+                        self.client_connect("",false);
+                    }
+                    self.end = false;
+                    self.draw_menu.in_menu = true;
+                    self.first = true;
+                    self.wall.update(false);
+                    self.player.update(false);
+                    self.exit.update(false);
+                    self.bomb.update(false);
+                }
             }
 
 
@@ -708,6 +776,7 @@ impl EventHandler for MyGame {
         self.exit.draw(&mut canvas, self.solo);
         self.bomb.draw(&mut canvas, self.solo);
         self.draw_menu.draw(&mut canvas);
+        self.timer.draw(&mut canvas);
         canvas.finish(ctx)?;
 
         Ok(())
