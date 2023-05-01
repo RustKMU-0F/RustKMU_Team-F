@@ -703,6 +703,20 @@ impl EventHandler for MyGame {
                             .collect::<Vec<Vec<char>>>();
                         println!("{:?}", maze);
                         self.map = maze;
+                        let mut buffer = [0u8; 4];
+                        unsafe {
+                            if let Some(server_socket) = &mut self.socket_client {
+                                server_socket.read(&mut buffer).map_err(|e| {
+                                    io::Error::new(
+                                        ErrorKind::Other,
+                                        format!("Failed to receive data from server: {}", e),
+                                    )
+                                })?;
+                                // println!("{:?}", buffer);
+                            }
+                        }
+                        self.player.pos.x = i16::from_be_bytes(buffer[0..2].try_into().unwrap());
+                        self.player.pos.y = i16::from_be_bytes(buffer[2..4].try_into().unwrap());
                     }
 
 
