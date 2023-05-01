@@ -29,7 +29,18 @@ static mut bomb_col: usize = 0;
 static mut exit_row: usize = 0;
 static mut exit_col: usize = 0;
 static mut server_true: bool = false;
-const DESIRED_FPS: u32 = 8;
+static mut socket_client: Option<TcpStream> = None;
+unsafe fn connect2server() {
+    socket_client = (TcpStream::connect("127.0.0.1:8088")
+        .map_err(|e| {
+            io::Error::new(
+                ErrorKind::Other,
+                format!("Failed to connect to server: {}", e),
+            )
+        })
+        .ok());
+}
+
 
 unsafe fn init_map() -> Vec<Vec<char>> {
 
@@ -151,6 +162,9 @@ impl MyGame {
         }
         Ok(())
 
+    }
+    fn update_map(mut self, map:Vec<Vec<char>>){
+        self.map = map;
     }
     fn handle_client(mut stream: TcpStream){
         let mut data = [0 as u8; 50]; // using 50 byte buffer
@@ -589,27 +603,62 @@ impl Wall {
 
 impl EventHandler for MyGame {
     fn update(&mut self, _ctx: &mut Context) -> GameResult {
-        while _ctx.time.check_update_time(DESIRED_FPS) {
+
             if !self.draw_menu.in_menu {
                 self.solo = self.draw_menu.solo;
-                if !self.solo{
-                    if self.draw_menu.user_type && self.first{
+                if !self.solo {
+                    if self.first && self.draw_menu.user_type{
                         self.first = false;
+                        println!("asd");
+                        self.client_connect("127.0.0.1:8088");
+                        println!("asd");
+                        self.mulit_player.update(true);
+                        let maze_flat = self.map.iter().flatten().map(|&c| c as u8).collect::<Vec<u8>>();
+                        println!("{:?}", maze_flat.len());
                         unsafe {
-                            server_true = true;
+                            if let Some(server_socket) = &mut self.socket_client {
+                                // println!("{:?}", player_pos_bytes);
+                                server_socket
+                                    .write_all(&maze_flat)
+                                    .map_err(|e| {
+                                        io::Error::new(
+                                            ErrorKind::Other,
+                                            format!("Failed to send player position to server: {}", e),
+                                        )
+                                    })?;
+                            }
                         }
-
-                        self.client_connect("127.0.0.1:8080");
-
-                    }else if self.first{
-                        self.first = false;
-                        self.client_connect("127.0.0.1:8080");
                     }
-                    self.mulit_player.update(true);
+                    if self.first {
+                        self.first = false;
+                        println!("asd");
+                        self.client_connect("127.0.0.1:8088");
+                        println!("asd");
+                        self.mulit_player.update(true);
+                        let mut buffer = [0u8; 900];
+                        unsafe {
+                            if let Some(server_socket) = &mut self.socket_client {
+                                server_socket.read(&mut buffer).map_err(|e| {
+                                    io::Error::new(
+                                        ErrorKind::Other,
+                                        format!("Failed to receive data from server: {}", e),
+                                    )
+                                })?;
+                                // println!("{:?}", buffer);
+                            }
+                        }
+                        let maze = buffer.chunks(30 as usize)
+                            .map(|chunk| chunk.iter().map(|&b| b as char).collect())
+                            .collect::<Vec<Vec<char>>>();
+                        println!("{:?}", maze);
+                        self.map = maze;
+                    }
+
 
                     let player_pos_bytes_x = self.player.pos.x.to_be_bytes();
                     let player_pos_bytes_y = self.player.pos.y.to_be_bytes();
                     let mut player_pos_bytes = [&player_pos_bytes_x[..], &player_pos_bytes_y[..]].concat();
+
                     unsafe {
                         if let Some(server_socket) = &mut self.socket_client {
                             // println!("{:?}", player_pos_bytes);
@@ -627,7 +676,7 @@ impl EventHandler for MyGame {
                     let mut buffer = [0u8; 4];
                     unsafe {
                         if let Some(server_socket) = &mut self.socket_client {
-                            server_socket.read_exact(&mut buffer).map_err(|e| {
+                            server_socket.read(&mut buffer).map_err(|e| {
                                 io::Error::new(
                                     ErrorKind::Other,
                                     format!("Failed to receive data from server: {}", e),
@@ -638,14 +687,13 @@ impl EventHandler for MyGame {
                     }
                     self.mulit_player.pos.x = i16::from_be_bytes(buffer[0..2].try_into().unwrap());
                     self.mulit_player.pos.y = i16::from_be_bytes(buffer[2..4].try_into().unwrap());
-
                 }
                 self.wall.update(true);
                 self.player.update(true);
                 self.exit.update(true);
                 self.bomb.update(true);
             }
-        }
+
 
 
         Ok(())
@@ -680,16 +728,6 @@ impl EventHandler for MyGame {
 
 
 fn main() {
-    let handle = thread::spawn(move || unsafe {
-        loop{
-            if server_true{
-                server::make_socket_server().expect("TODO: panic message");
-                break;
-            }
-        }
-
-
-    });
     let (mut ctx, event_loop) = ContextBuilder::new("my_game", "Cool Game Author")
         .window_mode(ggez::conf::WindowMode::default().dimensions(1900.0, 1200.0))
         .build()
