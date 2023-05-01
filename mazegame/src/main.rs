@@ -452,18 +452,18 @@ impl Player {
     fn go(&mut self, dir: Direction, solo:bool, map:Vec<Vec<char>>) {
         if solo{
             match dir {
-                Direction::Up => if self.pos.y >= 0 && map[self.pos.x as usize][self.pos.y as usize-1] != '#' && self.pos.y<= 30 {self.pos.y -= 1},
-                Direction::Down => if self.pos.y >= 0 && map[self.pos.x as usize][self.pos.y as usize+1] != '#' && self.pos.y<= 30 {self.pos.y += 1},
-                Direction::Left => if self.pos.x >= 0 && map[self.pos.x as usize -1][self.pos.y as usize] != '#' && self.pos.x<= 30 {self.pos.x -= 1},
-                Direction::Right => if self.pos.x >= 0 && map[self.pos.x as usize +1][self.pos.y as usize] != '#' && self.pos.x<= 30 {self.pos.x += 1},
+                Direction::Up => if self.pos.y >= 0 && self.pos.y<= 30 && map[self.pos.x as usize][self.pos.y as usize-1] != '#'  {self.pos.y -= 1},
+                Direction::Down => if self.pos.y >= 0 && self.pos.y < 29 && map[self.pos.x as usize][self.pos.y as usize+1] != '#' {self.pos.y += 1},
+                Direction::Left => if self.pos.x >= 0 && self.pos.x <= 30 && map[self.pos.x as usize -1][self.pos.y as usize] != '#' {self.pos.x -= 1},
+                Direction::Right => if self.pos.x >= 0 && self.pos.x < 29 && map[self.pos.x as usize +1][self.pos.y as usize] != '#' {self.pos.x += 1},
                 _ => {}
             }
         }else{
             match dir {
-                Direction::Up => if self.pos.y >= 0 && map[self.pos.x as usize][self.pos.y as usize-1] != '#' && self.pos.y<= 30 {self.pos.y -= 1},
-                Direction::Down => if self.pos.y >= 0 && map[self.pos.x as usize][self.pos.y as usize+1] != '#' && self.pos.y<= 30 {self.pos.y += 1},
-                Direction::Left => if self.pos.x >= 0 && map[self.pos.x as usize -1][self.pos.y as usize] != '#' && self.pos.x<= 30 {self.pos.x -= 1},
-                Direction::Right => if self.pos.x >= 0 && map[self.pos.x as usize +1][self.pos.y as usize] != '#' && self.pos.x<= 30 {self.pos.x += 1},
+                Direction::Up => if self.pos.y >= 0 && self.pos.y<= 30 && map[self.pos.x as usize][self.pos.y as usize-1] != '#' {self.pos.y -= 1},
+                Direction::Down => if self.pos.y >= 0 && self.pos.y < 29 && map[self.pos.x as usize][self.pos.y as usize+1] != '#'  {self.pos.y += 1},
+                Direction::Left => if self.pos.x >= 0 && self.pos.x<= 30 && map[self.pos.x as usize -1][self.pos.y as usize] != '#'  {self.pos.x -= 1},
+                Direction::Right => if self.pos.x >= 0 && self.pos.x < 29 && map[self.pos.x as usize +1][self.pos.y as usize] != '#'  {self.pos.x += 1},
                 _ => {}
             }
         }
