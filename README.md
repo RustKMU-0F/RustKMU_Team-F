@@ -1,2 +1,2 @@
-# RustKMU_TeamF
-Well come team F
+# 시스템 최신기술 Rust Team Project
+
